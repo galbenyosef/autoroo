@@ -16,6 +16,7 @@ const KEY_CONTROLS: Readonly<Record<string, DrivingControl>> = {
 const GAME_KEYS = new Set([
   ...Object.keys(KEY_CONTROLS),
   'Escape',
+  'KeyP',
   'Enter',
   'KeyR',
 ]);
@@ -51,7 +52,7 @@ export class InputBuffer {
     if (control && !repeat) this.press(control, `keyboard:${code}`);
     if (repeat) return null;
 
-    if (code === 'Escape') return 'pause';
+    if (code === 'Escape' || code === 'KeyP') return 'pause';
     if (code === 'Enter' || code === 'KeyR') return 'restart';
     return null;
   }

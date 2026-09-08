@@ -539,7 +539,11 @@ export function AutorooApp() {
                   <span>Jump</span>
                 </span>
                 <span className="start-control">
-                  <Kbd>Esc</Kbd>
+                  <span className="start-keys">
+                    <Kbd>Esc</Kbd>
+                    <span>or</span>
+                    <Kbd>P</Kbd>
+                  </span>
                   <span>Pause</span>
                 </span>
               </div>
@@ -558,7 +562,7 @@ export function AutorooApp() {
             <Play fill="currentColor" /> Resume
           </Button>
           <p className="key-hint keyboard-hint">
-            or press <Kbd>Esc</Kbd>
+            or press <Kbd>Esc</Kbd> or <Kbd>P</Kbd>
           </p>
         </section>
       )}
