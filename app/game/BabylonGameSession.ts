@@ -89,6 +89,7 @@ import { AdaptiveRenderQuality } from './renderQuality';
 import { chaseCameraFraming } from './cameraFraming';
 import { CrashAnimation } from './crashAnimation';
 import { makeBoosterState } from './boosters';
+import { LandingPoofVisuals, landingPoofCarPose } from './landingPoofVisuals';
 
 interface SessionCallbacks {
   readonly onReady: () => void;
@@ -237,6 +238,7 @@ export class BabylonGameSession {
   private readonly target = new Vector3();
   private readonly crashAnimation = new CrashAnimation();
   private readonly inactiveBoosterVisuals = makeBoosterState();
+  private readonly landingPoofs: LandingPoofVisuals;
 
   private readonly onKeyDown = (event: KeyboardEvent) => {
     // Consume the menu shortcut until release, including repeats after starting.
@@ -400,6 +402,7 @@ export class BabylonGameSession {
 
     this.simulation = new AutorooSimulation(seed);
     this.boosterVisuals = new BoosterVisuals(this.scene);
+    this.landingPoofs = new LandingPoofVisuals(this.scene);
     this.buildNightSky();
     this.buildGround();
     this.buildStreetlights();
@@ -417,6 +420,7 @@ export class BabylonGameSession {
   start(): void {
     this.presentationDirty = true;
     this.crashAnimation.reset();
+    this.landingPoofs.reset();
     this.simulation.start();
     this.input.clear();
     this.accumulatorS = 0;
@@ -429,6 +433,7 @@ export class BabylonGameSession {
   restart(): void {
     this.presentationDirty = true;
     this.crashAnimation.reset();
+    this.landingPoofs.reset();
     this.simulation.restart();
     this.input.clear();
     this.accumulatorS = 0;
@@ -1389,6 +1394,11 @@ export class BabylonGameSession {
         this.accumulatorS -= FIXED_DT;
         steps += 1;
         for (const event of this.simulation.drainEvents()) {
+          if (event.type === 'landing-poof')
+            this.landingPoofs.start(
+              event,
+              window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+            );
           if (event.type === 'crash') this.beginCrash();
           this.audio.play(event);
           this.callbacks.onEvent(event);
@@ -1532,7 +1542,9 @@ export class BabylonGameSession {
     let sedanIndex = 0;
     let suvIndex = 0;
     let busIndex = 0;
-    for (const vehicle of this.simulation.renderTraffic) {
+    const allocate = (
+      vehicle: Readonly<TrafficVehicle>,
+    ): VisualEntry | undefined => {
       let entry: VisualEntry | undefined;
       if (vehicle.kind === 'bus') entry = this.busPool[busIndex++];
       else if (vehicle.kind === 'suv') {
@@ -1545,8 +1557,25 @@ export class BabylonGameSession {
         else if (suvIndex < this.suvPool.length)
           entry = this.suvPool[suvIndex++];
       }
-      if (!entry) continue;
-      this.placeTrafficVisual(entry, vehicle, playerZ, alpha);
+      return entry;
+    };
+    this.landingPoofs.update(
+      playerZ,
+      (this.simulation.renderTick + alpha) * FIXED_DT,
+    );
+    this.landingPoofs.forEachCar((vehicle, elapsed, reducedMotion) => {
+      const entry = allocate(vehicle);
+      if (!entry) return;
+      this.placeTrafficVisual(entry, vehicle, playerZ, 1);
+      entry.holder.position.z += vehicle.speedMps * elapsed;
+      const pose = landingPoofCarPose(elapsed, reducedMotion);
+      entry.holder.scaling.set(pose.scaleX, pose.scaleY, pose.scaleZ);
+      entry.holder.rotation.z = pose.roll;
+      if (entry.shadow) entry.shadow.setEnabled(false);
+    });
+    for (const vehicle of this.simulation.renderTraffic) {
+      const entry = allocate(vehicle);
+      if (entry) this.placeTrafficVisual(entry, vehicle, playerZ, alpha);
     }
     for (let index = sedanIndex; index < this.sedanPool.length; index += 1) {
       setVisible(this.sedanPool[index], false);
@@ -1574,8 +1603,13 @@ export class BabylonGameSession {
       return;
     }
     setVisible(entry, true);
+    entry.holder.scaling.setAll(1);
+    entry.holder.rotation.setAll(0);
     entry.holder.position.set(LANE_X[vehicle.lane], entry.groundY, z);
-    if (entry.shadow) entry.shadow.position.set(LANE_X[vehicle.lane], 0.05, z);
+    if (entry.shadow) {
+      entry.shadow.setEnabled(true);
+      entry.shadow.position.set(LANE_X[vehicle.lane], 0.05, z);
+    }
   }
 
   private dividerActive(boundary: number, distanceM: number): boolean {

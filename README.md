@@ -34,8 +34,12 @@ object pools, while React owns the HUD and menus.
   with an empty inventory.
 - The rare **Yeet Rocket** launches automatically on collection: a four-second,
   480 m flight with the same midair lane changes and barrel rolls as jumping.
-  Traffic stays on the road, collisions still count, and landing earns +750
-  bonus points. Steer to choose a clear landing lane.
+  Landing earns +750 bonus points. Yeet and double jumps poof traffic in a
+  narrow pocket underneath and just ahead during the final descent, with a
+  quick squash, dust puff, and silly pop. Traffic generation is unchanged;
+  ordinary jumps and collisions outside the pocket still count. The pocket
+  follows physical steering, ends at touchdown, and gives no extra pass points
+  or shield consumption for removed cars.
 - Booster candidates alternate between road edges at roughly 240 m intervals.
   Seeded 1,440 m blocks nominate three springs, two shields, and one rocket;
   unsafe taper locations and mandatory jump-chain regions are skipped. Normal

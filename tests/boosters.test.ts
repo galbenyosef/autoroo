@@ -573,7 +573,7 @@ describe('Yeet Rocket', () => {
   );
 
   it.each(['sedan', 'bus'] as const)(
-    'can crash into a %s during descent without clearing it or awarding a landing',
+    'poofs a %s during descent and awards the landing',
     (kind) => {
       const run = launchRocket();
       const landingM = run.renderBoosters.rocket!.landingZM;
@@ -590,22 +590,25 @@ describe('Yeet Rocket', () => {
       ]);
       for (let i = 0; i < flightTicks && run.phaseName === 'running'; i += 1)
         run.tick(drive);
-      expect(run.phaseName).toBe('game-over');
-      expect(run.renderBoosters.rocket).not.toBeNull();
-      expect(run.renderPlayer.absoluteZM).toBeLessThan(landingM);
+      expect(run.phaseName).toBe('running');
+      expect(run.renderBoosters.rocket).toBeNull();
+      expect(run.renderPlayer.absoluteZM).toBeCloseTo(landingM);
       expect(
         run.renderTraffic.some((vehicle) => vehicle.id === 'landing-hit'),
-      ).toBe(true);
+      ).toBe(false);
       const events = run.drainEvents();
-      expect(events.filter((event) => event.type === 'crash')).toHaveLength(1);
+      expect(events.filter((event) => event.type === 'crash')).toHaveLength(0);
+      expect(
+        events.filter((event) => event.type === 'landing-poof'),
+      ).toHaveLength(1);
       expect(
         events.filter((event) => event.type === 'rocket-land'),
-      ).toHaveLength(0);
+      ).toHaveLength(1);
       expect(
         events.filter(
           (event) => event.type === 'bonus' && event.points === ROCKET_BONUS,
         ),
-      ).toHaveLength(0);
+      ).toHaveLength(1);
     },
   );
 
@@ -663,7 +666,7 @@ describe('Yeet Rocket', () => {
     expect(run.phaseName).toBe('game-over');
   });
 
-  it('still lets Bubble Buddy absorb a landing collision by consuming the shield', () => {
+  it('preserves Bubble Buddy when landing traffic is poofed away', () => {
     const run = launchRocket();
     run.__debugSetBoosters({ shieldCount: 2 });
     run.__debugReplaceTraffic([
@@ -679,10 +682,10 @@ describe('Yeet Rocket', () => {
     ]);
     for (let i = 0; i < flightTicks; i += 1) run.tick(drive);
     expect(run.phaseName).toBe('running');
-    expect(run.renderBoosters.shieldCount).toBe(1);
+    expect(run.renderBoosters.shieldCount).toBe(2);
     expect(
       run.drainEvents().filter((event) => event.type === 'shield-pop'),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
   });
 
   it('uses identical lane movement, queued reversals and barrel-roll poses to a normal jump', () => {

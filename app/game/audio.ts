@@ -101,6 +101,12 @@ export class AutorooAudio {
         this.chirp(440, 660, 0.18, 'triangle', 0.09, 0.12);
         this.chirp(660, 880, 0.24, 'triangle', 0.075, 0.26);
         break;
+      case 'landing-poof':
+        if (event.first && event.vehicles.length > 0) {
+          this.chirp(230, 70, 0.14, 'triangle', 0.08);
+          this.chirp(85, 45, 0.12, 'sine', 0.09, 0.035);
+        }
+        break;
       case 'shield-pop':
         this.chirp(680, 65, 0.12, 'sine', 0.15);
         this.chirp(180, 470, 0.25, 'triangle', 0.08, 0.09);

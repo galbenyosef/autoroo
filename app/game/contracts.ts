@@ -199,6 +199,13 @@ export type GameEvent =
   | { readonly type: 'double-jump' }
   | { readonly type: 'rocket-launch' }
   | { readonly type: 'rocket-land' }
+  | {
+      readonly type: 'landing-poof';
+      readonly tick: number;
+      /** Play one sound for the whole landing, even if steering catches another car. */
+      readonly first: boolean;
+      readonly vehicles: readonly Readonly<TrafficVehicle>[];
+    }
   | { readonly type: 'shield-pop' }
   | { readonly type: 'jump' }
   | { readonly type: 'lane-change' }

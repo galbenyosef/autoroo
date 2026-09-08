@@ -66,6 +66,11 @@ import {
   roadModuleForDistance,
 } from './generator';
 import { drivingAccelerationMps2, speedLimitForScore } from './speed';
+import {
+  LANDING_CLEARANCE_LEAD_S,
+  isInsideLandingPocket,
+  landingSecondsRemaining,
+} from './landingClearance';
 import { hashParts, hashUnit, stableHash } from './random';
 import {
   BOOSTER_POOL_SIZE,
@@ -1016,6 +1021,7 @@ function stepWorld(
   input: InputFrame,
   boosts?: BoosterState,
   onBonus?: (points: number, label: string) => void,
+  beforeCollisions?: () => void,
 ): number {
   applyInputLane(world.player, input, world.seed);
   const wasAirborne = world.player.airborne;
@@ -1051,6 +1057,10 @@ function stepWorld(
 
   const newMask = laneMaskAt(world.seed, world.player.absoluteZM);
   enforceActiveLaneTarget(world.player, newMask);
+
+  // Only live play supplies this hook. Generation witnesses retain their
+  // original traffic and collision rules, independent of landing effects.
+  beforeCollisions?.();
 
   for (const vehicle of world.traffic) {
     if (
@@ -2264,6 +2274,7 @@ export class AutorooSimulation {
   }
 
   private resetRun(): void {
+    this.landingPoofStarted = false;
     this.phase = 'ready';
     this.tickNumber = 0;
     this.player = makePlayer();
@@ -2309,6 +2320,7 @@ export class AutorooSimulation {
       !this.boosters.rocket
     ) {
       this.boosters.doubleJumpCount -= 1;
+      this.landingPoofStarted = false;
       this.boosters.doubleJumpUsedThisFlight = true;
       this.boosters.doubleJumpOriginYM = this.player.yM;
       this.boosters.doubleJumpElapsedS = 0;
@@ -2325,6 +2337,7 @@ export class AutorooSimulation {
       input,
       this.boosters,
       this.onPassBonus,
+      enhancedFlight ? this.clearLandingTraffic : undefined,
     );
     if ((outcome & WORLD_JUMPED) !== 0) this.emitEvent({ type: 'jump' });
     if ((outcome & WORLD_CRASHED) !== 0) {
@@ -2370,7 +2383,7 @@ export class AutorooSimulation {
     if (this.boosters.rocket && !this.player.airborne) this.finishRocket();
     if (this.boosters.rocket) {
       // Continue ordinary traffic using rocket-aware route proofs. New rows
-      // still appear beyond the fog; the landing area is never cleared.
+      // still appear beyond the fog, independently of the local landing poof.
       this.fillAhead();
     } else if (this.boosters.doubleJumpOriginYM === null) {
       this.advanceGateLifecycle();
@@ -2448,6 +2461,7 @@ export class AutorooSimulation {
   }
 
   private launchRocket(): void {
+    this.landingPoofStarted = false;
     const landingZM = this.player.absoluteZM + ROCKET_DISTANCE_M;
     this.boosters.rocket = {
       elapsedS: 0,
@@ -2486,6 +2500,44 @@ export class AutorooSimulation {
       points: ROCKET_BONUS,
     });
   }
+
+  private landingPoofStarted = false;
+
+  private readonly clearLandingTraffic = (): void => {
+    const remainingS = landingSecondsRemaining(this.player, this.boosters);
+    if (remainingS > LANDING_CLEARANCE_LEAD_S) return;
+    const landingZM =
+      this.boosters.rocket?.landingZM ??
+      this.player.absoluteZM + this.player.takeoffSpeedMps * remainingS;
+    const drivingSpeed = this.boosters.rocket
+      ? speedLimitForScore(
+          Math.floor(this.player.maxForwardM) + this.bonusScore,
+        )
+      : this.player.speedMps;
+    const removed: TrafficVehicle[] = [];
+    this.world.traffic = this.traffic.filter((vehicle) => {
+      if (
+        !isInsideLandingPocket(
+          this.player,
+          vehicle,
+          landingZM,
+          remainingS,
+          drivingSpeed,
+        )
+      )
+        return true;
+      removed.push({ ...vehicle });
+      return false;
+    });
+    if (removed.length === 0) return;
+    this.emitEvent({
+      type: 'landing-poof',
+      tick: this.tickNumber,
+      first: !this.landingPoofStarted,
+      vehicles: removed,
+    });
+    this.landingPoofStarted = true;
+  };
 
   private readonly onPassBonus = (points: number, label: string): void => {
     this.lastBonusLabel = `${label} +${points}`;

@@ -43,7 +43,8 @@ export const BOOSTER_INFO = {
     name: 'Yeet Rocket',
     rarity: 'Rare',
     color: '#ff9861',
-    instruction: 'Auto-launch! Steer midair, dodge traffic, and land for +750.',
+    instruction:
+      'Auto-launch! Steer midair, poof nearby landing traffic, and land for +750.',
   },
   shield: {
     name: 'Bubble Buddy',
